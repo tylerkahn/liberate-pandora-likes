@@ -1,7 +1,7 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 
 module Pandora.PandoraLikes (Track(..),
-		StationId, SortOrder(Ascending, Descending), SortKey(Artist, Date),
+		StationId, SortOrder(..), SortKey(..),
 		makeRequestString, getLikedTracks) where
 
 import Network.HTTP (getResponseBody, getRequest, simpleHTTP)
