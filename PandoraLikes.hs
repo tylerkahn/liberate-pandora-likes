@@ -1,6 +1,6 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 
-module PandoraLikes (Track(..),
+module Pandora.PandoraLikes (Track(..),
 		StationId, SortOrder(Ascending, Descending), SortKey(Artist, Date),
 		makeRequestString, getLikedTracks) where
 
