@@ -1,6 +1,6 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 
-module PandoraLikes (Track(name, artist, date), 
+module PandoraLikes (Track(..),
 		StationId, SortOrder(Ascending, Descending), SortKey(Artist, Date),
 		makeRequestString, getLikedTracks) where
 
@@ -41,7 +41,7 @@ splitIntoTrackSections tags = partitions p tags
 		p _			= False
 
 makeTrack :: TrackHTMLFragment -> Track
-makeTrack thf = Track (rawInfo !! 0) (removeBy $ rawInfo !! 1) (rawInfo !! 2) 
+makeTrack thf = Track (rawInfo !! 0) (removeBy $ rawInfo !! 1) (rawInfo !! 2)
 		where 	f = filter (/= "") . splitOneOf "\n\t\160" . innerText
 			removeBy = drop 3
 			rawInfo = f thf
@@ -62,7 +62,7 @@ makeRequestString sid so sk fbi = base ++ intercalate "&" [stationIdFragment, fe
 				sortKeyFragment = "posSortBy=" ++ case sk of
 						Date -> "date"
 						Artist -> "artist"
-			
+
 
 getLikedTracks' :: (FeedbackIndex -> String) -> Maybe FeedbackIndex -> IO [Track] -> IO [Track]
 getLikedTracks' _   Nothing  tracks = tracks
@@ -71,7 +71,7 @@ getLikedTracks' req (Just fbi) tracks = do
 					let tracks' = map makeTrack $ splitIntoTrackSections tags
 					let fbi' = getFeedbackIndex tags
 					getLikedTracks' req fbi' (fmap (++ tracks') tracks)
-					
+
 
 getLikedTracks :: (FeedbackIndex -> String) -> IO [Track]
 getLikedTracks req = getLikedTracks' req (Just 0) (return [])
