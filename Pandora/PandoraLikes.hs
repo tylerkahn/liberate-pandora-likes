@@ -8,7 +8,7 @@ import Network.HTTP (getResponseBody, getRequest, simpleHTTP)
 import Text.HTML.TagSoup
 import Data.List.Split (splitOneOf)
 import Data.Maybe (listToMaybe)
-import Data.List (intercalate)
+import Data.List (intercalate, isInfixOf)
 import Data.Typeable
 import Data.Data
 
@@ -49,7 +49,7 @@ makeTrack thf = Track (rawInfo !! 0) (removeBy $ rawInfo !! 1) (rawInfo !! 2)
 
 getFeedbackIndex :: [Tag String] -> Maybe FeedbackIndex
 getFeedbackIndex tags = maybe Nothing (Just . atoi . fromAttrib "data-nextStartIndex") showMore
-			where 	showMore = listToMaybe (filter (\x -> isTagOpenName "div" x && fromAttrib "class" x == "show_more") tags)
+			where 	showMore = listToMaybe (filter (\x -> isTagOpenName "div" x && "show_more" `isInfixOf` fromAttrib "class" x) tags)
 
 makeRequestString :: StationId -> SortOrder -> SortKey -> FeedbackIndex -> String
 makeRequestString sid so sk fbi = base ++ intercalate "&" [stationIdFragment, feedbackIndexFragment, sortOrderFragment, sortKeyFragment]
