@@ -2,7 +2,7 @@ import System.Environment
 import qualified Text.JSON.Generic as JSON (toJSON)
 import qualified Text.JSON as JSON (encode)
 
-import PandoraLikes
+import Pandora.PandoraLikes
 
 usage :: IO ()
 usage = do
