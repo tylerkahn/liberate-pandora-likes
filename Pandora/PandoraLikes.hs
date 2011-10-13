@@ -2,7 +2,7 @@
 
 module Pandora.PandoraLikes (Track(..),
 		StationId, SortOrder(..), SortKey(..),
-		makeRequestString, getLikedTracks, defaultRequestString) where
+		getLikedTracks, requestByUser, requestByStation, simpleRequestByStation) where
 
 import Network.HTTP (getResponseBody, getRequest, simpleHTTP)
 import Text.HTML.TagSoup
@@ -13,11 +13,16 @@ import Data.Typeable
 import Data.Data
 
 
-data Track = Track {name :: String, artist :: String, date :: String}
+data Track = Track {name :: String, artist :: String, date :: Maybe String}
 	deriving (Show, Eq, Typeable, Data)
 
 type TrackHTMLFragment = [Tag String]
 type FeedbackIndex = Int
+type Request = FeedbackIndex -> String
+
+data PandoraRequest = PandoraRequest {trackSplitter :: [Tag String] -> [TrackHTMLFragment],
+						trackMaker :: TrackHTMLFragment -> Track,
+						request :: Request}
 
 type StationId = String
 
@@ -27,32 +32,45 @@ data SortOrder = Ascending | Descending
 data SortKey = Artist | Date
 	deriving (Show, Eq)
 
-
 atoi :: String -> Int
 atoi s = read s :: Int
 
 openURL :: String -> IO String
 openURL x = getResponseBody =<< simpleHTTP (getRequest x)
 
-splitIntoTrackSections :: [Tag String] -> [TrackHTMLFragment]
-splitIntoTrackSections tags = partitions p tags
+matchTagAndClass :: String -> String -> Tag String -> Bool
+matchTagAndClass t c x = isTagOpenName t x && c `isInfixOf` fromAttrib "class" x
+
+tracksByStationSplitter :: [Tag String] -> [TrackHTMLFragment]
+tracksByStationSplitter tags = partitions p tags
 	where	p (TagOpen tag _) 	= tag == "li"
 		p (TagText "Show More")	= True
 		p _			= False
 
-makeTrack :: TrackHTMLFragment -> Track
-makeTrack thf = Track (rawInfo !! 0) (removeBy $ rawInfo !! 1) (rawInfo !! 2)
+tracksByUserSplitter :: [Tag String] -> [TrackHTMLFragment]
+tracksByUserSplitter = partitions $ matchTagAndClass "div" "infobox-body"
+
+
+{-
+ - (partitions (\x -> isTagOpenName "div" x && "infobox-body" `isInfixOf` fromAttrib "class" x))
+ - take 2 $ wordsBy (flip elem "\n\t")  $ innerText
+ -}
+
+makeByStationTrack :: TrackHTMLFragment -> Track
+makeByStationTrack thf = Track (rawInfo !! 0) (removeBy $ rawInfo !! 1) (Just $ rawInfo !! 2)
 		where 	f = filter (/= "") . splitOneOf "\n\t\160" . innerText
 			removeBy = drop 3
 			rawInfo = f thf
 
+makeByUserTrack thf = (makeByStationTrack thf) {date = Nothing}
+
 
 getFeedbackIndex :: [Tag String] -> Maybe FeedbackIndex
 getFeedbackIndex tags = maybe Nothing (Just . atoi . fromAttrib "data-nextStartIndex") showMore
-			where 	showMore = listToMaybe (filter (\x -> isTagOpenName "div" x && "show_more" `isInfixOf` fromAttrib "class" x) tags)
+			where 	showMore = listToMaybe $ filter (matchTagAndClass "div" "show_more") tags
 
-makeRequestString :: StationId -> SortOrder -> SortKey -> FeedbackIndex -> String
-makeRequestString sid so sk fbi = base ++ intercalate "&" [stationIdFragment, feedbackIndexFragment, sortOrderFragment, sortKeyFragment]
+makeRequestByStationString :: StationId -> SortOrder -> SortKey -> FeedbackIndex -> String
+makeRequestByStationString sid so sk fbi = base ++ intercalate "&" [stationIdFragment, feedbackIndexFragment, sortOrderFragment, sortKeyFragment]
 			where 	base =  "http://www.pandora.com/content/station_track_thumbs?"
 				stationIdFragment = "stationId=" ++ sid
 				feedbackIndexFragment = "posFeedbackStartIndex=" ++ (show fbi)
@@ -63,17 +81,35 @@ makeRequestString sid so sk fbi = base ++ intercalate "&" [stationIdFragment, fe
 						Date -> "date"
 						Artist -> "artist"
 
-defaultRequestString :: StationId -> (FeedbackIndex -> String)
-defaultRequestString sid = makeRequestString sid Descending Date
+makeRequestByUserString :: String -> FeedbackIndex -> String
+makeRequestByUserString user fbi = base ++ intercalate "&" [userFragment, feedbackIndexFragment] where
+							base = "http://www.pandora.com/content/tracklikes?"
+							userFragment = "webname=" ++ user
+							feedbackIndexFragment = "trackStartIndex=" ++ show fbi
 
-getLikedTracks' :: (FeedbackIndex -> String) -> Maybe FeedbackIndex -> IO [Track] -> IO [Track]
+requestByStation :: StationId -> SortOrder -> SortKey -> PandoraRequest
+requestByStation sid so sk = PandoraRequest {
+								request = makeRequestByStationString sid so sk,
+								trackSplitter = tracksByStationSplitter,
+								trackMaker = makeByStationTrack }
+
+requestByUser :: String -> PandoraRequest
+requestByUser u = PandoraRequest {
+					request = makeRequestByUserString u,
+					trackSplitter = tracksByUserSplitter,
+					trackMaker = makeByUserTrack}
+
+simpleRequestByStation:: StationId -> PandoraRequest
+simpleRequestByStation sid = requestByStation sid Descending Date
+
+getLikedTracks' :: PandoraRequest -> Maybe FeedbackIndex -> IO [Track] -> IO [Track]
 getLikedTracks' _   Nothing  tracks = tracks
-getLikedTracks' req (Just fbi) tracks = do
-					tags <- fmap parseTags $ openURL (req fbi)
-					let tracks' = map makeTrack $ splitIntoTrackSections tags
+getLikedTracks' preq (Just fbi) tracks = do
+					tags <- fmap parseTags $ openURL (request preq fbi)
+					let tracks' = map (trackMaker preq) $ trackSplitter preq tags
 					let fbi' = getFeedbackIndex tags
-					getLikedTracks' req fbi' (fmap (++ tracks') tracks)
+					getLikedTracks' preq fbi' (fmap (++ tracks') tracks)
 
 
-getLikedTracks :: (FeedbackIndex -> String) -> IO [Track]
-getLikedTracks req = getLikedTracks' req (Just 0) (return [])
+getLikedTracks :: PandoraRequest -> IO [Track]
+getLikedTracks preq = getLikedTracks' preq (Just 0) (return [])
