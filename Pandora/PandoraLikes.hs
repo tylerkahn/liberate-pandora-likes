@@ -2,7 +2,7 @@
 
 module Pandora.PandoraLikes (Track(..),
 		StationId, SortOrder(..), SortKey(..),
-		makeRequestString, getLikedTracks) where
+		makeRequestString, getLikedTracks, defaultRequestString) where
 
 import Network.HTTP (getResponseBody, getRequest, simpleHTTP)
 import Text.HTML.TagSoup
@@ -63,6 +63,8 @@ makeRequestString sid so sk fbi = base ++ intercalate "&" [stationIdFragment, fe
 						Date -> "date"
 						Artist -> "artist"
 
+defaultRequestString :: StationId -> (FeedbackIndex -> String)
+defaultRequestString sid = makeRequestString sid Descending Date
 
 getLikedTracks' :: (FeedbackIndex -> String) -> Maybe FeedbackIndex -> IO [Track] -> IO [Track]
 getLikedTracks' _   Nothing  tracks = tracks
