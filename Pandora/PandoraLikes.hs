@@ -2,7 +2,7 @@
 
 module Pandora.PandoraLikes (PandoraRequest, Track(..),
 		StationId, SortOrder(..), SortKey(..),
-		getLikedTracks, requestByUser, requestByStation, simpleRequestByStation) where
+		getLikedTracks, requestByUser, requestByUserBookmarks, requestByStation, simpleRequestByStation) where
 
 import Network.HTTP (getResponseBody, getRequest, simpleHTTP)
 import Text.HTML.TagSoup
@@ -81,11 +81,13 @@ makeRequestByStationString sid so sk fbi = base ++ intercalate "&" [stationIdFra
 						Date -> "date"
 						Artist -> "artist"
 
-makeRequestByUserString :: String -> FeedbackIndex -> String
-makeRequestByUserString user fbi = base ++ intercalate "&" [userFragment, feedbackIndexFragment] where
-							base = "http://www.pandora.com/content/tracklikes?"
+mrus :: String -> String -> FeedbackIndex -> String
+mrus base user fbi = base ++ intercalate "&" [userFragment, feedbackIndexFragment] where
 							userFragment = "webname=" ++ user
 							feedbackIndexFragment = "trackStartIndex=" ++ show fbi
+
+makeRequestByUserString = mrus "http://www.pandora.com/content/tracklikes?"
+makeRequestByUserBookmarkString = mrus "http://www.pandora.com/content/bookmarked_tracks?"
 
 requestByStation :: StationId -> SortOrder -> SortKey -> PandoraRequest
 requestByStation sid so sk = PandoraRequest {
@@ -98,6 +100,8 @@ requestByUser u = PandoraRequest {
 					request = makeRequestByUserString u,
 					trackSplitter = tracksByUserSplitter,
 					trackMaker = makeByUserTrack}
+
+requestByUserBookmarks u = (requestByUser u) {request = makeRequestByUserBookmarkString u}
 
 simpleRequestByStation:: StationId -> PandoraRequest
 simpleRequestByStation sid = requestByStation sid Descending Date
