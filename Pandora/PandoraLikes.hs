@@ -5,7 +5,7 @@ module Pandora.PandoraLikes (PandoraRequest, Track(..),
 		getLikedTracks, requestByUser, requestByUserBookmarks, requestByStation, simpleRequestByStation) where
 
 -- import Network.HTTP.Enumerator (simpleHttp)
-import Network.HTTP
+import Network.HTTP (getRequest, getResponseBody, simpleHTTP)
 import Text.HTML.TagSoup
 import Data.List.Split (splitOneOf)
 import Data.Maybe (listToMaybe)
