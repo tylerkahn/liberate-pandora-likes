@@ -4,7 +4,8 @@ module Pandora.PandoraLikes (PandoraRequest, Track(..),
 		StationId, SortOrder(..), SortKey(..),
 		getLikedTracks, requestByUser, requestByUserBookmarks, requestByStation, simpleRequestByStation) where
 
-import Network.HTTP.Enumerator (simpleHttp)
+-- import Network.HTTP.Enumerator (simpleHttp)
+import Network.HTTP
 import Text.HTML.TagSoup
 import Data.List.Split (splitOneOf)
 import Data.Maybe (listToMaybe)
@@ -38,7 +39,8 @@ atoi :: String -> Int
 atoi s = read s :: Int
 
 openURL :: String -> IO String
-openURL x = simpleHttp x >>= return . SB.unpack . SB.concat . LB.toChunks
+-- openURL x = simpleHttp x >>= return . SB.unpack . SB.concat . LB.toChunks
+openURL x = getResponseBody =<< simpleHTTP (getRequest x)
 
 matchTagAndClass :: String -> String -> Tag String -> Bool
 matchTagAndClass t c x = isTagOpenName t x && c `isInfixOf` fromAttrib "class" x
