@@ -1,17 +1,19 @@
-{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveDataTypeable, NoMonomorphismRestriction #-}
 
 module Pandora.PandoraLikes (PandoraRequest, Track(..),
 		StationId, SortOrder(..), SortKey(..),
 		getLikedTracks, requestByUser, requestByUserBookmarks, requestByStation, simpleRequestByStation) where
 
-import Network.HTTP (getResponseBody, getRequest, simpleHTTP)
+import Network.HTTP.Enumerator (simpleHttp)
 import Text.HTML.TagSoup
 import Data.List.Split (splitOneOf)
 import Data.Maybe (listToMaybe)
 import Data.List (intercalate, isInfixOf)
 import Data.Typeable
 import Data.Data
-
+import qualified Data.ByteString.Lazy as LB
+import qualified Data.ByteString.Char8 as SB
+import Control.Monad.State.Strict
 
 data Track = Track {name :: String, artist :: String, date :: Maybe String}
 	deriving (Show, Eq, Typeable, Data)
@@ -36,7 +38,7 @@ atoi :: String -> Int
 atoi s = read s :: Int
 
 openURL :: String -> IO String
-openURL x = getResponseBody =<< simpleHTTP (getRequest x)
+openURL x = simpleHttp x >>= return . SB.unpack . SB.concat . LB.toChunks
 
 matchTagAndClass :: String -> String -> Tag String -> Bool
 matchTagAndClass t c x = isTagOpenName t x && c `isInfixOf` fromAttrib "class" x
@@ -106,14 +108,34 @@ requestByUserBookmarks u = (requestByUser u) {request = makeRequestByUserBookmar
 simpleRequestByStation:: StationId -> PandoraRequest
 simpleRequestByStation sid = requestByStation sid Descending Date
 
-getLikedTracks' :: PandoraRequest -> Maybe FeedbackIndex -> IO [Track] -> IO [Track]
-getLikedTracks' _   Nothing  tracks = tracks
-getLikedTracks' preq (Just fbi) tracks = do
-					tags <- fmap parseTags $ openURL (request preq fbi)
-					let tracks' = map (trackMaker preq) $ trackSplitter preq tags
-					let fbi' = getFeedbackIndex tags
-					getLikedTracks' preq fbi' (fmap (++ tracks') tracks)
 
+
+
+getNext' :: PandoraRequest -> (Maybe FeedbackIndex) -> IO ([Track], Maybe FeedbackIndex)
+getNext' preq (Just fbi) = do
+								tags <- fmap parseTags $ openURL (request preq fbi)
+								let tracks = map (trackMaker preq) $ trackSplitter preq tags
+								let fbi' = getFeedbackIndex tags
+								return (tracks, fbi')
+getNext' _ Nothing = return ([], Nothing)
+
+getNext :: PandoraRequest -> StateT (Maybe FeedbackIndex) IO [Track]
+getNext preq = StateT $ getNext' preq
+
+
+runUntil :: Monad m => (a -> Bool) -> StateT a m b -> a -> m [(b, a)]
+runUntil p st i = if p i then return [] else do
+		k@(val, i') <- runStateT st i
+		liftM (return k ++) $ runUntil p st i'
+
+evalUntil p st i = liftM (map fst) $ runUntil p st i
+execUntil p st i = liftM (map snd) $ runUntil p st i
+
+runWhile = runUntil . (not .)
+evalWhile p st i = liftM (map fst) $ runWhile p st i
+execWhile p st i = liftM (map snd) $ runWhile p st i
+
+		-- if p fbi' then return [tracks'] else liftM ([tracks'] ++) runUntil p $ return fbi'
 
 getLikedTracks :: PandoraRequest -> IO [Track]
-getLikedTracks preq = getLikedTracks' preq (Just 0) (return [])
+getLikedTracks preq = liftM concat $ evalUntil (== Nothing) (getNext preq) (Just 0)
