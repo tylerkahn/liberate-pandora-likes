@@ -28,9 +28,6 @@ data SortKey = Artist | Date
 	deriving (Show, Eq)
 
 
-atoi :: String -> Int
-atoi s = read s :: Int
-
 openURL :: String -> IO String
 openURL x = getResponseBody =<< simpleHTTP (getRequest x)
 
@@ -48,7 +45,7 @@ makeTrack thf = Track (rawInfo !! 0) (removeBy $ rawInfo !! 1) (rawInfo !! 2)
 
 
 getFeedbackIndex :: [Tag String] -> Maybe FeedbackIndex
-getFeedbackIndex tags = maybe Nothing (Just . atoi . fromAttrib "data-nextStartIndex") showMore
+getFeedbackIndex tags = maybe Nothing (Just . read . fromAttrib "data-nextStartIndex") showMore
 			where 	showMore = listToMaybe (filter (\x -> isTagOpenName "div" x && fromAttrib "class" x == "show_more") tags)
 
 makeRequestString :: StationId -> SortOrder -> SortKey -> FeedbackIndex -> String
