@@ -35,8 +35,6 @@ data SortOrder = Ascending | Descending
 data SortKey = Artist | Date
 	deriving (Show, Eq)
 
-atoi :: String -> Int
-atoi s = read s :: Int
 
 openURL :: String -> IO String
 -- openURL x = simpleHttp x >>= return . SB.unpack . SB.concat . LB.toChunks
@@ -70,8 +68,8 @@ makeByUserTrack thf = (makeByStationTrack thf) {date = Nothing}
 
 
 getFeedbackIndex :: [Tag String] -> Maybe FeedbackIndex
-getFeedbackIndex tags = maybe Nothing (Just . atoi . fromAttrib "data-nextStartIndex") showMore
-			where 	showMore = listToMaybe $ filter (matchTagAndClass "div" "show_more") tags
+getFeedbackIndex tags = maybe Nothing (Just . read . fromAttrib "data-nextStartIndex") showMore
+			where 	showMore = listToMaybe (filter (\x -> isTagOpenName "div" x && fromAttrib "class" x == "show_more") tags)
 
 makeRequestByStationString :: StationId -> SortOrder -> SortKey -> FeedbackIndex -> String
 makeRequestByStationString sid so sk fbi = base ++ intercalate "&" [stationIdFragment, feedbackIndexFragment, sortOrderFragment, sortKeyFragment]

@@ -1,0 +1,18 @@
+Name: LiberatePandoraLikes
+Version: 1.1
+Cabal-Version: >= 1.2
+License: MIT
+License-File:LICENSE
+Author: Tyler Kahn
+Homepage: https://github.com/tkahn6/liberate-pandora-likes
+Category: Third-Party API
+Synopsis: An interface to http://pandora.com to pull thumbed-up tracks.
+Build-Type: Simple
+
+Library
+  Build-Depends: base, json >= 0.5, HTTP >= 4000.1.2, tagsoup >= 0.12.6,
+    split >= 0.1.4.2
+  Exposed-modules: Pandora.PandoraLikes
+
+Executable pandora-likes
+  Main-Is:  Main.hs
