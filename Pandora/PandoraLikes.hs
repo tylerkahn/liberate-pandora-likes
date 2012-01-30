@@ -2,7 +2,7 @@
 
 module Pandora.PandoraLikes (Track(..),
 		StationId, SortOrder(..), SortKey(..),
-		makeRequestString, getLikedTracks, defaultRequestString) where
+		makeRequest, getLikedTracks, defaultRequest) where
 
 import Network.HTTP (getResponseBody, getRequest, simpleHTTP)
 import Text.HTML.TagSoup
@@ -20,6 +20,8 @@ type TrackHTMLFragment = [Tag String]
 type FeedbackIndex = Int
 
 type StationId = String
+
+type Request = FeedbackIndex -> String
 
 data SortOrder = Ascending | Descending
 	deriving (Show, Eq)
@@ -48,8 +50,8 @@ getFeedbackIndex :: [Tag String] -> Maybe FeedbackIndex
 getFeedbackIndex tags = maybe Nothing (Just . read . fromAttrib "data-nextStartIndex") showMore
 			where 	showMore = listToMaybe (filter (\x -> isTagOpenName "div" x && fromAttrib "class" x == "show_more") tags)
 
-makeRequestString :: StationId -> SortOrder -> SortKey -> FeedbackIndex -> String
-makeRequestString sid so sk fbi = base ++ intercalate "&" [stationIdFragment, feedbackIndexFragment, sortOrderFragment, sortKeyFragment]
+makeRequest :: StationId -> SortOrder -> SortKey -> Request
+makeRequest sid so sk fbi = base ++ intercalate "&" [stationIdFragment, feedbackIndexFragment, sortOrderFragment, sortKeyFragment]
 			where 	base =  "http://www.pandora.com/content/station_track_thumbs?"
 				stationIdFragment = "stationId=" ++ sid
 				feedbackIndexFragment = "posFeedbackStartIndex=" ++ (show fbi)
@@ -60,10 +62,10 @@ makeRequestString sid so sk fbi = base ++ intercalate "&" [stationIdFragment, fe
 						Date -> "date"
 						Artist -> "artist"
 
-defaultRequestString :: StationId -> (FeedbackIndex -> String)
-defaultRequestString sid = makeRequestString sid Descending Date
+defaultRequest :: StationId -> Request
+defaultRequest sid = makeRequest sid Descending Date
 
-getLikedTracks' :: (FeedbackIndex -> String) -> Maybe FeedbackIndex -> IO [Track] -> IO [Track]
+getLikedTracks' :: Request -> Maybe FeedbackIndex -> IO [Track] -> IO [Track]
 getLikedTracks' _   Nothing  tracks = tracks
 getLikedTracks' req (Just fbi) tracks = do
 					tags <- fmap parseTags $ openURL (req fbi)
@@ -72,5 +74,5 @@ getLikedTracks' req (Just fbi) tracks = do
 					getLikedTracks' req fbi' (fmap (++ tracks') tracks)
 
 
-getLikedTracks :: (FeedbackIndex -> String) -> IO [Track]
+getLikedTracks :: Request -> IO [Track]
 getLikedTracks req = getLikedTracks' req (Just 0) (return [])
