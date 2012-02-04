@@ -1,22 +1,22 @@
-{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveDataTypeable, Arrows #-}
 
 module Pandora.PandoraLikes (Track(..),
 		StationId, SortOrder(..), SortKey(..), Request,
 		makeRequest, getLikedTracks, defaultRequest) where
 
 import Network.HTTP (getResponseBody, getRequest, simpleHTTP)
-import Text.HTML.TagSoup
-import Data.List.Split (splitOneOf)
+import Text.XML.HXT.Core
+import Data.List.Split (splitEvery)
 import Data.Maybe (listToMaybe)
 import Data.List (intercalate)
 import Data.Typeable
 import Data.Data
-
+import Text.Regex.PCRE
+import Text.Regex.PCRE.String
 
 data Track = Track {name :: String, artist :: String, date :: String}
 	deriving (Show, Eq, Typeable, Data)
 
-type TrackHTMLFragment = [Tag String]
 type FeedbackIndex = Int
 
 type StationId = String
@@ -33,22 +33,23 @@ data SortKey = Artist | Date
 openURL :: String -> IO String
 openURL x = getResponseBody =<< simpleHTTP (getRequest x)
 
-splitIntoTrackSections :: [Tag String] -> [TrackHTMLFragment]
-splitIntoTrackSections tags = partitions p tags
-	where	p (TagOpen tag _) 	= tag == "li"
-		p (TagText "Show More")	= True
-		p _			= False
+parseHTML = readString [withValidate no,
+						withParseHTML yes,
+						withWarnings no]
 
-makeTrack :: TrackHTMLFragment -> Track
-makeTrack thf = Track (rawInfo !! 0) (removeBy $ rawInfo !! 1) (rawInfo !! 2)
-		where 	f = filter (/= "") . splitOneOf "\n\t\160" . innerText
-			removeBy = drop 3
-			rawInfo = f thf
+pandoraDate :: String -> Bool
+pandoraDate s = s =~ "\\d{2}-\\d{2}-\\d{4}"
 
+extractTracks :: String -> IO [Track]
+extractTracks html = do
+				nameArtists <- runX $ parseHTML html >>> deep (isElem >>> hasName "a" >>> getChildren >>> getText)
+				dates <- runX $ parseHTML html >>> deep ((isText >>> getText >>> isA pandoraDate))
+				return [Track n a d | [d, n, a] <- zipWith (:) dates (splitEvery 2 nameArtists)]
 
-getFeedbackIndex :: [Tag String] -> Maybe FeedbackIndex
-getFeedbackIndex tags = maybe Nothing (Just . read . fromAttrib "data-nextStartIndex") showMore
-			where 	showMore = listToMaybe (filter (\x -> isTagOpenName "div" x && fromAttrib "class" x == "show_more") tags)
+getFeedbackIndex :: String -> IO (Maybe FeedbackIndex)
+getFeedbackIndex html = do
+					s <- runX $ parseHTML html >>> deep (isElem >>> hasAttr "data-nextstartindex" >>> getAttrValue "data-nextstartindex")
+					return $ listToMaybe s >>= return . read
 
 makeRequest :: StationId -> SortOrder -> SortKey -> Request
 makeRequest sid so sk fbi = base ++ intercalate "&" [stationIdFragment, feedbackIndexFragment, sortOrderFragment, sortKeyFragment]
@@ -68,9 +69,9 @@ defaultRequest sid = makeRequest sid Descending Date
 getLikedTracks' :: Request -> Maybe FeedbackIndex -> IO [Track] -> IO [Track]
 getLikedTracks' _   Nothing  tracks = tracks
 getLikedTracks' req (Just fbi) tracks = do
-					tags <- fmap parseTags $ openURL (req fbi)
-					let tracks' = map makeTrack $ splitIntoTrackSections tags
-					let fbi' = getFeedbackIndex tags
+					html <- openURL $ req fbi
+					tracks' <- extractTracks html
+					fbi' <- getFeedbackIndex html
 					getLikedTracks' req fbi' (fmap (++ tracks') tracks)
 
 
