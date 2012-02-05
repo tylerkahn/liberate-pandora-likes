@@ -14,7 +14,7 @@ main = do
 	case (length args) of
 		1 -> do
 			let stationId = (args !! 0)
-			tracks <- getLikedTracks (makeRequest stationId Descending Date)
+			tracks <- getLikedTracks (makeTrackRequest stationId Descending Date)
 			putStrLn $ JSON.encode $ JSON.toJSON tracks
 		otherwise -> usage
 

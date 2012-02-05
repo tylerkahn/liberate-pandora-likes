@@ -2,7 +2,8 @@
 
 module Pandora.PandoraLikes (Track(..), Station(..),
 		StationId, SortOrder(..), SortKey(..), TrackRequest,
-		makeTrackRequest, getLikedTracks, defaultTrackRequest) where
+		makeTrackRequest, getLikedTracks, defaultTrackRequest,
+		makeStationRequest, getStations) where
 
 import Network.HTTP (getResponseBody, getRequest, simpleHTTP)
 import Text.XML.HXT.Core
@@ -73,8 +74,8 @@ makeTrackRequest sid so sk fbi = base ++ intercalate "&" [stationIdFragment, fee
 						Date -> "date"
 						Artist -> "artist"
 
-makeStationsRequest :: String -> String
-makeStationsRequest = (++) "http://www.pandora.com/content/stations?webname="
+makeStationRequest :: String -> String
+makeStationRequest = (++) "http://www.pandora.com/content/stations?webname="
 
 defaultTrackRequest :: StationId -> TrackRequest
 defaultTrackRequest sid = makeTrackRequest sid Descending Date
@@ -94,5 +95,5 @@ getLikedTracks req = getLikedTracks' req (Just 0) (return [])
 
 getStations :: String -> IO [Station]
 getStations username = do
-				html <- openURL $ makeStationsRequest username
+				html <- openURL $ makeStationRequest username
 				extractStations html
