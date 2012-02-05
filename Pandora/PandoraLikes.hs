@@ -73,10 +73,13 @@ makeTrackRequest sid so sk fbi = base ++ intercalate "&" [stationIdFragment, fee
 						Date -> "date"
 						Artist -> "artist"
 
+makeStationsRequest :: String -> String
+makeStationsRequest = (++) "http://www.pandora.com/content/stations?webname="
+
 defaultTrackRequest :: StationId -> TrackRequest
 defaultTrackRequest sid = makeTrackRequest sid Descending Date
 
-getLikedTracks' :: Request -> Maybe FeedbackIndex -> IO [Track] -> IO [Track]
+getLikedTracks' :: TrackRequest -> Maybe FeedbackIndex -> IO [Track] -> IO [Track]
 getLikedTracks' _   Nothing  tracks = tracks
 getLikedTracks' req (Just fbi) tracks = do
 					html <- openURL $ req fbi
@@ -87,3 +90,9 @@ getLikedTracks' req (Just fbi) tracks = do
 
 getLikedTracks :: TrackRequest -> IO [Track]
 getLikedTracks req = getLikedTracks' req (Just 0) (return [])
+
+
+getStations :: String -> IO [Station]
+getStations username = do
+				html <- openURL $ makeStationsRequest username
+				extractStations html
