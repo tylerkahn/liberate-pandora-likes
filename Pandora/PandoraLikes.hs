@@ -6,7 +6,7 @@ module Pandora.PandoraLikes (Track(..),
 
 import Network.HTTP (getResponseBody, getRequest, simpleHTTP)
 import Text.XML.HXT.Core
-import Data.List.Split (splitEvery)
+import Data.List.Split (splitEvery, splitOneOf)
 import Data.Maybe (listToMaybe)
 import Data.List (intercalate)
 import Data.Typeable
@@ -15,6 +15,9 @@ import Text.Regex.PCRE
 import Text.Regex.PCRE.String
 
 data Track = Track {name :: String, artist :: String, date :: String}
+	deriving (Show, Eq, Typeable, Data)
+
+data Station = Station {stationName :: String, stationId :: StationId}
 	deriving (Show, Eq, Typeable, Data)
 
 type FeedbackIndex = Int
@@ -45,6 +48,13 @@ extractTracks html = do
 				nameArtists <- runX $ parseHTML html >>> deep (isElem >>> hasName "a" >>> getChildren >>> getText)
 				dates <- runX $ parseHTML html >>> deep ((isText >>> getText >>> isA pandoraDate))
 				return [Track n a d | [d, n, a] <- zipWith (:) dates (splitEvery 2 nameArtists)]
+
+extractStations :: String -> IO [Station]
+extractStations html = do
+				links <- runX $ parseHTML html >>> deep (isElem >>> hasName "h3" >>> getChildren >>> getChildren >>> isElem >>> hasName "a" >>> getAttrValue "href")
+				names <- runX $ parseHTML html >>> deep (isElem >>> hasName "h3" >>> getChildren >>> getChildren >>> isElem >>> hasName "a" >>> getChildren >>> getText)
+				let sids = map (last . splitOneOf "/") links
+				return $ zipWith Station names sids
 
 getFeedbackIndex :: String -> IO (Maybe FeedbackIndex)
 getFeedbackIndex html = do
