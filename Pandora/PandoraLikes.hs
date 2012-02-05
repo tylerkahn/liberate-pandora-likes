@@ -1,8 +1,8 @@
 {-# LANGUAGE DeriveDataTypeable, Arrows #-}
 
-module Pandora.PandoraLikes (Track(..),
-		StationId, SortOrder(..), SortKey(..), Request,
-		makeRequest, getLikedTracks, defaultRequest) where
+module Pandora.PandoraLikes (Track(..), Station(..),
+		StationId, SortOrder(..), SortKey(..), TrackRequest,
+		makeTrackRequest, getLikedTracks, defaultTrackRequest) where
 
 import Network.HTTP (getResponseBody, getRequest, simpleHTTP)
 import Text.XML.HXT.Core
@@ -14,7 +14,7 @@ import Data.Data
 import Text.Regex.PCRE
 import Text.Regex.PCRE.String
 
-data Track = Track {name :: String, artist :: String, date :: String}
+data Track = Track {trackTitle :: String, trackArtist :: String, trackDate :: String}
 	deriving (Show, Eq, Typeable, Data)
 
 data Station = Station {stationName :: String, stationId :: StationId}
@@ -24,7 +24,7 @@ type FeedbackIndex = Int
 
 type StationId = String
 
-type Request = FeedbackIndex -> String
+type TrackRequest = FeedbackIndex -> String
 
 data SortOrder = Ascending | Descending
 	deriving (Show, Eq)
@@ -61,8 +61,8 @@ getFeedbackIndex html = do
 					s <- runX $ parseHTML html >>> deep (isElem >>> hasAttr "data-nextstartindex" >>> getAttrValue "data-nextstartindex")
 					return $ listToMaybe s >>= return . read
 
-makeRequest :: StationId -> SortOrder -> SortKey -> Request
-makeRequest sid so sk fbi = base ++ intercalate "&" [stationIdFragment, feedbackIndexFragment, sortOrderFragment, sortKeyFragment]
+makeTrackRequest :: StationId -> SortOrder -> SortKey -> TrackRequest
+makeTrackRequest sid so sk fbi = base ++ intercalate "&" [stationIdFragment, feedbackIndexFragment, sortOrderFragment, sortKeyFragment]
 			where 	base =  "http://www.pandora.com/content/station_track_thumbs?"
 				stationIdFragment = "stationId=" ++ sid
 				feedbackIndexFragment = "posFeedbackStartIndex=" ++ (show fbi)
@@ -73,8 +73,8 @@ makeRequest sid so sk fbi = base ++ intercalate "&" [stationIdFragment, feedback
 						Date -> "date"
 						Artist -> "artist"
 
-defaultRequest :: StationId -> Request
-defaultRequest sid = makeRequest sid Descending Date
+defaultTrackRequest :: StationId -> TrackRequest
+defaultTrackRequest sid = makeTrackRequest sid Descending Date
 
 getLikedTracks' :: Request -> Maybe FeedbackIndex -> IO [Track] -> IO [Track]
 getLikedTracks' _   Nothing  tracks = tracks
@@ -85,5 +85,5 @@ getLikedTracks' req (Just fbi) tracks = do
 					getLikedTracks' req fbi' (fmap (++ tracks') tracks)
 
 
-getLikedTracks :: Request -> IO [Track]
+getLikedTracks :: TrackRequest -> IO [Track]
 getLikedTracks req = getLikedTracks' req (Just 0) (return [])
