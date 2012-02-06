@@ -94,6 +94,7 @@ getLikedTracks req = getLikedTracks' req (Just 0) (return [])
 
 
 getStations :: String -> IO [Station]
-getStations username = do
-				html <- openURL $ makeStationRequest username
-				extractStations html
+getStations req = do
+				html <- openURL req
+				stations <- extractStations html
+				return stations
